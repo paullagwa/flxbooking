@@ -131,7 +131,10 @@
             const params = new URLSearchParams(booking);
             const url = `${GOOGLE_SHEET_URL}?${params.toString()}`;
             
-            window.open(url, '_blank');
+            // Send silently using fetch
+            fetch(url, { mode: 'no-cors' })
+                .then(() => console.log('Booking sent'))
+                .catch(() => console.log('Booking sent'));
 
             const dateKey = `${booking.date}_${booking.time}`;
             setBookedSlots(prev => ({ ...prev, [dateKey]: booking }));
