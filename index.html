@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FLX - Book an Appointment</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #000;
+            min-height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+```
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+    const { useState } = React;
+
+    const BookingCalendar = () => {
+        const [currentDate, setCurrentDate] = useState(new Date());
+        const [selectedDate, setSelectedDate] = useState(null);
+        const [selectedTime, setSelectedTime] = useState(null);
+        const [selectedDuration, setSelectedDuration] = useState(30);
+        const [bookingConfirmed, setBookingConfirmed] = useState(false);
+        const [bookedSlots, setBookedSlots] = useState({});
+        const [showClientForm, setShowClientForm] = useState(false);
+        const [clientInfo, setClientInfo] = useState({
+            name: '',
+            email: '',
+            phone: '',
+            notes: ''
+        });
+
+        const GOOGLE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbzPVx1cv594cMeKV7wd_PXPK4sDydMfgF7aPJ8VxsOcpuT0pmMWfjPV7EcxEtHq6cvgqg/exec';
+
+        const generateTimeSlots = () => {
+            const slots = [];
+            for (let hour = 9; hour < 18; hour++) {
+                slots.push(`${hour}:00`);
+                if (hour < 17 || selectedDuration === 30) {
+                    slots.push(`${hour}:30`);
+                }
+            }
+            return slots;
+        };
+
+        const isSlotAvailable = (date, time) => {
+            const dateKey = `${date.toISOString().split('T')[0]}_${time}`;
+            return !bookedSlots[dateKey];
+        };
+
+        const isWeekday = (date) => {
+            const day = date.getDay();
+            return day !== 0 && day !== 6;
+        };
+
+        const getDaysInMonth = (date) => {
+            const year = date.getFullYear();
+            const month = date.getMonth();
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const daysInMonth = lastDay.getDate();
+            const startingDayOfWeek = firstDay.getDay();
+            return { daysInMonth, startingDayOfWeek };
+        };
+
+        const formatDate = (date) => {
+            return date.toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+        };
+
+        const previousMonth = () => {
+            setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1));
+            setSelectedDate(null);
+            setSelectedTime(null);
+        };
+
+        const nextMonth = () => {
+            setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
+            setSelectedDate(null);
+            setSelectedTime(null);
+        };
+
+        const selectDate = (day) => {
+            const selected = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+            if (isWeekday(selected) && selected >= new Date().setHours(0, 0, 0, 0)) {
+                setSelectedDate(selected);
+                setSelectedTime(null);
+                setShowClientForm(false);
+            }
+        };
+
+        const handleClientInfoChange = (field, value) => {
+            setClientInfo(prev => ({ ...prev, [field]: value }));
+        };
+
+        const proceedToClientForm = () => {
+            if (selectedDate && selectedTime) {
+                setShowClientForm(true);
+            }
+        };
+
+        const confirmBooking = () => {
+            if (!clientInfo.name || !clientInfo.email) {
+                alert('Please fill in your name and email');
+                return;
+            }
+
+            const booking = {
+                date: selectedDate.toISOString().split('T')[0],
+                time: selectedTime,
+                duration: selectedDuration,
+                clientName: clientInfo.name,
+                clientEmail: clientInfo.email,
+                clientPhone: clientInfo.phone || '',
+                notes: clientInfo.notes || ''
+            };
+
+            const params = new URLSearchParams(booking);
+            const url = `${GOOGLE_SHEET_URL}?${params.toString()}`;
+            
+            window.open(url, '_blank');
+
+            const dateKey = `${booking.date}_${booking.time}`;
+            setBookedSlots(prev => ({ ...prev, [dateKey]: booking }));
+            setBookingConfirmed(true);
+        };
+
+        const resetBooking = () => {
+            setSelectedDate(null);
+            setSelectedTime(null);
+            setBookingConfirmed(false);
+            setShowClientForm(false);
+            setClientInfo({ name: '', email: '', phone: '', notes: '' });
+        };
+
+        const { daysInMonth, startingDayOfWeek } = getDaysInMonth(currentDate);
+        const monthName = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        const timeSlots = generateTimeSlots();
+
+        return (
+            <div className="min-h-screen bg-black py-12 px-6">
+                <div className="max-w-5xl mx-auto">
+                    <div className="mb-8 text-center">
+                        <h1 className="text-5xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-purple-500 bg-clip-text text-transparent mb-4">
+                            FLX
+                        </h1>
+                        <p className="text-gray-300 text-lg mb-2">Book an Appointment</p>
+                        <p className="text-gray-400">Select a date and time slot (Monday-Friday, 9am-6pm)</p>
+                    </div>
+
+                    {bookingConfirmed ? (
+                        <div className="bg-gradient-to-br from-purple-900/50 to-pink-900/50 border-2 border-purple-500 rounded-lg p-8 text-center backdrop-blur-sm">
+                            <div className="text-6xl mb-4">✓</div>
+                            <h2 className="text-2xl font-bold text-white mb-2">Booking Confirmed!</h2>
+                            <div className="bg-black/50 rounded-lg p-6 mb-6 max-w-md mx-auto text-left border border-purple-500/30">
+                                <p className="text-lg font-semibold text-purple-300 mb-3">Appointment Details:</p>
+                                <p className="text-gray-200 mb-1"><strong className="text-purple-400">Date:</strong> {formatDate(selectedDate)}</p>
+                                <p className="text-gray-200 mb-1"><strong className="text-purple-400">Time:</strong> {selectedTime}</p>
+                                <p className="text-gray-200 mb-1"><strong className="text-purple-400">Duration:</strong> {selectedDuration} minutes</p>
+                                <p className="text-gray-200 mb-1"><strong className="text-purple-400">Name:</strong> {clientInfo.name}</p>
+                                <p className="text-gray-200 mb-1"><strong className="text-purple-400">Email:</strong> {clientInfo.email}</p>
+                                {clientInfo.phone && <p className="text-gray-200 mb-1"><strong className="text-purple-400">Phone:</strong> {clientInfo.phone}</p>}
+                            </div>
+                            <p className="text-gray-300 mb-6">Your booking has been submitted!</p>
+                            <button 
+                                onClick={resetBooking}
+                                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-lg hover:from-purple-600 hover:to-pink-600 transition font-semibold"
+                            >
+                                Book Another Appointment
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="grid lg:grid-cols-3 gap-6">
+                            <div className="lg:col-span-2">
+                                <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg p-4 mb-4 border border-purple-500/30">
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-semibold text-purple-300 mb-2">
+                                            Appointment Duration
+                                        </label>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => setSelectedDuration(30)}
+                                                className={`px-4 py-2 rounded-lg transition ${
+                                                    selectedDuration === 30 ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                                                }`}
+                                            >
+                                                30 min
+                                            </button>
+                                            <button
+                                                onClick={() => setSelectedDuration(60)}
+                                                className={`px-4 py-2 rounded-lg transition ${
+                                                    selectedDuration === 60 ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                                                }`}
+                                            >
+                                                60 min
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg p-4 border border-purple-500/30">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <button 
+                                            onClick={previousMonth}
+                                            className="p-2 hover:bg-purple-500/20 rounded-lg transition text-purple-400"
+                                        >
+                                            ←
+                                        </button>
+                                        <h2 className="text-xl font-semibold text-white">{monthName}</h2>
+                                        <button 
+                                            onClick={nextMonth}
+                                            className="p-2 hover:bg-purple-500/20 rounded-lg transition text-purple-400"
+                                        >
+                                            →
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-7 gap-1 mb-2">
+                                        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
+                                            <div key={day} className="text-center text-sm font-semibold text-purple-300 py-2">
+                                                {day}
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="grid grid-cols-7 gap-1">
+                                        {Array.from({ length: startingDayOfWeek }).map((_, i) => (
+                                            <div key={`empty-${i}`} className="aspect-square"></div>
+                                        ))}
+                                        {Array.from({ length: daysInMonth }).map((_, i) => {
+                                            const day = i + 1;
+                                            const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+                                            const isAvailable = isWeekday(date) && date >= new Date().setHours(0, 0, 0, 0);
+                                            const isSelected = selectedDate && selectedDate.getDate() === day && 
+                                                            selectedDate.getMonth() === currentDate.getMonth();
+
+                                            return (
+                                                <button
+                                                    key={day}
+                                                    onClick={() => selectDate(day)}
+                                                    disabled={!isAvailable}
+                                                    className={`aspect-square flex items-center justify-center rounded-lg text-sm transition
+                                                        ${isSelected ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold' : ''}
+                                                        ${isAvailable && !isSelected ? 'bg-gray-700 hover:bg-purple-500/20 text-gray-200' : ''}
+                                                        ${!isAvailable ? 'bg-gray-800 text-gray-600 cursor-not-allowed' : ''}
+                                                    `}
+                                                >
+                                                    {day}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg p-4 border border-purple-500/30">
+                                {!showClientForm ? (
+                                    <>
+                                        <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                                            Select Time
+                                        </h2>
+                                        
+                                        {selectedDate ? (
+                                            <>
+                                                <p className="text-sm text-gray-300 mb-4">{formatDate(selectedDate)}</p>
+                                                <div className="grid grid-cols-2 gap-2 max-h-96 overflow-y-auto">
+                                                    {timeSlots.map(time => {
+                                                        const available = isSlotAvailable(selectedDate, time);
+                                                        return (
+                                                            <button
+                                                                key={time}
+                                                                onClick={() => setSelectedTime(time)}
+                                                                disabled={!available}
+                                                                className={`py-3 px-4 rounded-lg text-sm font-medium transition
+                                                                    ${selectedTime === time ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : ''}
+                                                                    ${available && selectedTime !== time ? 'bg-gray-700 text-gray-200 hover:bg-purple-500/20' : ''}
+                                                                    ${!available ? 'bg-gray-800 text-gray-600 cursor-not-allowed line-through' : ''}
+                                                                `}
+                                                            >
+                                                                {time}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                                
+                                                {selectedTime && (
+                                                    <button
+                                                        onClick={proceedToClientForm}
+                                                        className="w-full mt-6 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg font-semibold hover:from-purple-600 hover:to-pink-600 transition"
+                                                    >
+                                                        Continue
+                                                    </button>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <p className="text-gray-400 text-center py-12">
+                                                Please select a date to view available time slots
+                                            </p>
+                                        )}
+                                    </>
+                                ) : (
+                                    <>
+                                        <h2 className="text-xl font-semibold text-white mb-4">Your Information</h2>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-purple-300 mb-1">
+                                                    Name *
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={clientInfo.name}
+                                                    onChange={(e) => handleClientInfoChange('name', e.target.value)}
+                                                    className="w-full px-3 py-2 bg-gray-800 border border-purple-500/30 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white placeholder-gray-500"
+                                                    placeholder="John Doe"
+                                                />
+                                            </div>
+                                            
+                                            <div>
+                                                <label className="block text-sm font-medium text-purple-300 mb-1">
+                                                    Email *
+                                                </label>
+                                                <input
+                                                    type="email"
+                                                    value={clientInfo.email}
+                                                    onChange={(e) => handleClientInfoChange('email', e.target.value)}
+                                                    className="w-full px-3 py-2 bg-gray-800 border border-purple-500/30 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white placeholder-gray-500"
+                                                    placeholder="john@example.com"
+                                                />
+                                            </div>
+                                            
+                                            <div>
+                                                <label className="block text-sm font-medium text-purple-300 mb-1">
+                                                    Phone
+                                                </label>
+                                                <input
+                                                    type="tel"
+                                                    value={clientInfo.phone}
+                                                    onChange={(e) => handleClientInfoChange('phone', e.target.value)}
+                                                    className="w-full px-3 py-2 bg-gray-800 border border-purple-500/30 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white placeholder-gray-500"
+                                                    placeholder="(555) 123-4567"
+                                                />
+                                            </div>
+                                            
+                                            <div>
+                                                <label className="block text-sm font-medium text-purple-300 mb-1">
+                                                    Notes
+                                                </label>
+                                                <textarea
+                                                    value={clientInfo.notes}
+                                                    onChange={(e) => handleClientInfoChange('notes', e.target.value)}
+                                                    className="w-full px-3 py-2 bg-gray-800 border border-purple-500/30 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white placeholder-gray-500"
+                                                    rows="3"
+                                                    placeholder="Any additional information..."
+                                                />
+                                            </div>
+
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => setShowClientForm(false)}
+                                                    className="flex-1 bg-gray-700 text-gray-200 py-3 rounded-lg font-semibold hover:bg-gray-600 transition"
+                                                >
+                                                    Back
+                                                </button>
+                                                <button
+                                                    onClick={confirmBooking}
+                                                    className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg font-semibold hover:from-purple-600 hover:to-pink-600 transition"
+                                                >
+                                                    Confirm
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
+    ReactDOM.render(<BookingCalendar />, document.getElementById('root'));
+</script>
+```
+
+</body>
+</html>
